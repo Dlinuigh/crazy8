@@ -37,7 +37,8 @@ Server::Server() {
   boardcast_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); // 监听所有接口
   boardcast_addr.sin_port = htons(port);                         // 设置端口
 
-  // 绑定套接字
+  // 绑定套接字:x
+
   if (bind(fd, (const struct sockaddr *)&server_addr, sizeof(server_addr)) <
       0) {
     perror("Bind failed");

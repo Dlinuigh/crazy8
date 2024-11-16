@@ -27,7 +27,6 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         crazy8.h
-        crazy8_impl.inl
         server.h server.cpp
         client.h client.cpp
 
