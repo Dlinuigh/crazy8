@@ -17,21 +17,43 @@ public:
     void start_game() {
         setup_board();
         send_message(1);
+        deal();
     }
 public slots:
-    void onPlayerJoined() {
-        QString label{inet_ntoa(server->players_addr.back())};
-        ui->invited_players->addItem(label);
+    void onPlayerJoined() const {
+        crazy8::Message message{server->buffer.front()};
+        server->buffer.pop();
+        const std::string label{inet_ntoa(server->players_addr.back())};
+        ui->invited_players->addItem(label.c_str());
+    }
+    void onPlayerPlay() const {
+        crazy8::Message message{server->buffer.front()};
+        server->buffer.pop();
+        if(message.type == crazy8::MessageType::play) {
+            crazy8::CardPlayed card;
+            card.type = static_cast<int8_t>(message.data[0]);
+            board->players[token].get().operate(card.type, *board);
+            send_message(0);
+        }
     }
 
 private:
     std::unique_ptr<Board> board{nullptr};
     std::unique_ptr<Server>& server;
     Ui::Game *ui;
-    void setup_board() { board = std::make_unique<Board>(); }
+    // turn token
+    int token{0};
+    void setup_board() {
+        std::vector<std::reference_wrapper<Player>> players;
+        for(int i=0; i<server->max_players; ++i) {
+            Player tmp{};
+            players.emplace_back(tmp);
+        }
+        board = std::make_unique<Board>(players);
+    }
     void send_message(const int type) const {
         using namespace crazy8;
-        QString message;
+        std::string message;
         if(type == 0) {
             message = generate_message();
             server->response(message, MessageType::info);
@@ -45,15 +67,14 @@ private:
             server->response(message, MessageType::win);
         }
     }
-    [[nodiscard]] QString generate_message() const {
+    [[nodiscard]] std::string generate_message() const {
         int number = server->max_players;
         crazy8::Info info{};
-        QString message{};
+        std::string message{};
         Card pattern = board->top();
         auto hands{board->check_players_hand()};
         auto points{board->check_players_points()};
-        memcpy(info.start, "START", sizeof(info.start));
-        memcpy(info.end, "END", sizeof(info.end));
+        info.index = token;
         info.suit = pattern.suit;
         info.rank = pattern.rank;
         for(int i=0; i<number; ++i) {
@@ -62,6 +83,23 @@ private:
         }
         memcpy(message.data(), &info, sizeof(info));
         return message;
+    }
+    void deal() const {
+        board->deal();
+        for (int i = 0; i < server->max_players; ++i) {
+            std::string data{};
+            generate_hand(data, board->players[i].get().hand);
+            server->chat(i, data, crazy8::MessageType::deal);
+        }
+    }
+    static void generate_hand(std::string &data, const std::vector<Card> &hand) {
+        crazy8::Hand hand_data{};
+        for(int i=0; i<hand.size();++i) {
+            hand_data.index = i;
+            hand_data.suit[i] = static_cast<uint8_t>(hand.at(i).suit);
+            hand_data.rank[i] = static_cast<uint8_t>(hand.at(i).rank);
+        }
+        memcpy(data.data(), &hand_data, sizeof(hand_data));
     }
 };
 #endif // SERVERHANDLE_H

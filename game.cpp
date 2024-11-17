@@ -33,6 +33,7 @@ void Game::on_start_game_pressed() {
     server_handle = std::make_unique<ServerHandle>(server, ui);
     server_handle->start_game();
     connect(server.get(), &Server::PlayerJoin, server_handle.get(), &ServerHandle::onPlayerJoined);
+    connect(server.get(), &Server::PlayerPlay, server_handle.get(), &ServerHandle::onPlayerPlay);
 }
 
 void Game::on_host_btn_pressed() { ui->stackedWidget->setCurrentWidget(ui->host_page); }
@@ -42,6 +43,7 @@ void Game::on_join_btn_pressed() {
     client->start();
     client_handle = std::make_unique<ClientHandle>(client, ui);
     connect(client.get(), &Client::broadcast, client_handle.get(), &ClientHandle::onBroadcastReceived);
+    connect(client.get(), &Client::update, client_handle.get(), &ClientHandle::onUpdateReceived);
 }
 
 void Game::on_cancel_host_pressed() {

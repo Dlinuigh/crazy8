@@ -4,8 +4,6 @@
 #define SUIT_SIZE 4
 #define RANK_SIZE 13
 #include <algorithm>
-#include <qcontainerfwd.h>
-#include <qlist.h>
 #include <random>
 
 struct Card {
@@ -33,6 +31,8 @@ struct Card {
     Card(const Suit suit, const Rank rank) : suit(suit), rank(rank) {}
 };
 namespace crazy8 {
+    inline char suit_name[4][8] = { "Spade", "Heart", "Diamond", "Club" };
+    inline char rank_name[13][3] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
     enum MessageType : uint8_t {
         info, // server's message
         start,
@@ -40,26 +40,36 @@ namespace crazy8 {
         win, // notify everyone about winner.
         bye,
         broadcast,
+        deal,
 
         play, // player's game operate
         disconnect,
-        uncover,
         reply_broadcast,
     };
 #pragma pack(push, 1)
     // size: 32 bytes
     struct Info {
-        char start[5];
-        uint8_t number;
-        uint8_t suit;
-        uint8_t rank;
-        uint8_t hands[7];
-        uint16_t points[7];
-        char end[3];
+        uint8_t number{};
+        uint8_t suit{};
+        uint8_t rank{};
+        uint8_t hands[7]{};
+        int16_t points[7]{-1,-1,-1,-1,-1,-1,-1};
+        uint8_t index{};
+        uint8_t _empty[7]{};
     };
     struct Message {
         MessageType type;
         uint8_t data[sizeof(Info)];
+    };
+    struct Hand {
+        uint8_t index;
+        uint8_t suit[7];
+        uint8_t rank[7];
+        uint8_t _empty[17];
+    };
+    struct CardPlayed {
+        int8_t type{};// card or uncover
+        uint8_t _empty[31]{};
     };
 #pragma pack(pop)
 } // namespace crazy8
@@ -69,6 +79,7 @@ class Board;
 
 class Player {
 public:
+    std::vector<Card> hand{};
     Player() = default;
 
     Player(Player &&) noexcept;
@@ -99,7 +110,6 @@ public:
 
 private:
     int point{0};
-    std::vector<Card> hand{};
     void play(int, Board &);
 
     void input();
@@ -119,6 +129,7 @@ class Board {
 public:
     bool order{false};
     int score_to_win{0};
+    std::vector<std::reference_wrapper<Player>> players{};
     Board() = default;
     explicit Board(const std::vector<std::reference_wrapper<Player>> &_players) {
         score_to_win = 50 * _players.size();
@@ -136,26 +147,20 @@ public:
         discard_pile.push_back(deck.back());
         deck.pop_back();
     }
-    [[nodiscard]] QVector<int> check_players_hand() const {
-        QVector<int> hand;
+    [[nodiscard]] std::vector<int> check_players_hand() const {
+        std::vector<int> hand;
         for (auto p: players) {
             hand.push_back(p.get().count());
         }
         return hand;
     }
-    [[nodiscard]] QVector<int> check_players_points() const {
-        QVector<int> points;
+    [[nodiscard]] std::vector<int> check_players_points() const {
+        std::vector<int> points;
         for (auto p: players) {
             points.push_back(p.get().get_point());
         }
         return points;
     }
-
-private:
-    std::vector<Card> deck{};
-    std::vector<Card> discard_pile{};
-    std::vector<std::reference_wrapper<Player>> players{};
-
     void deal() {
         const int hand_cap = players.size() == 2 ? 7 : 5;
         for (int i = 0; i < hand_cap; ++i) {
@@ -165,6 +170,10 @@ private:
             }
         }
     }
+
+private:
+    std::vector<Card> deck{};
+    std::vector<Card> discard_pile{};
 
     void shuffle() {
         for (int j = 0; j < RANK_SIZE; ++j) {
@@ -214,7 +223,7 @@ inline void Player::operate(const int key, Board &board) {
         if (check(hand.at(key), pattern)) {
             play(key, board);
         }
-    } else if (key == ' ') {
+    } else if (key == -1) {
         board.uncover();
     }
 }

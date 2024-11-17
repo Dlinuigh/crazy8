@@ -2,8 +2,6 @@
 #define CLIENT_H
 
 #include <netinet/in.h>
-
-#include <QString>
 #include <QThread>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -15,7 +13,8 @@
 class Client : public QThread {
     Q_OBJECT
 public:
-    QVector<in_addr_t> hosts{};
+    std::vector<in_addr_t> hosts{};
+    crazy8::Info buffer{};
     Client() {
         try {
             fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -38,13 +37,47 @@ public:
     void receive() {
         // receive message and decode them. if address is self
         // emit a signal
+        sockaddr_in host_addr{};
+        socklen_t len = sizeof(host_addr);
+        crazy8::Message message{};
+        try {
+            if (recvfrom(fd, &message, sizeof(crazy8::Message), 0, reinterpret_cast<sockaddr *>(&host_addr), &len) ==
+                -1) {
+                throw errno;
+            } else {
+                if (addr.sin_addr.s_addr != host_addr.sin_addr.s_addr) {
+                    using namespace crazy8;
+                    switch (message.type) {
+                        case MessageType::start: {
+                            break;
+                        }
+                        case MessageType::end: {
+                            break;
+                        }
+                        case MessageType::win: {
+                            break;
+                        }
+                        case MessageType::info: {
+                            memcpy(&buffer, message.data, sizeof(crazy8::Info));
+                            break;
+                        }
+                        case MessageType::bye: {
+                            break;
+                        }
+                        default:;
+                    }
+                }
+            }
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
+        }
     }
-    void response(QString data, const crazy8::MessageType type) const {
+    void response(std::string data, const crazy8::MessageType type) const {
         try {
             crazy8::Message message{};
             message.type = type;
             memcpy(message.data, data.data(), sizeof(message.data));
-            constexpr int len = sizeof(message);
+            constexpr int len = sizeof(crazy8::Message);
             char buffer[len];
             memcpy(buffer, &message, len);
             if (sendto(fd, buffer, len, MSG_CONFIRM, reinterpret_cast<const sockaddr *>(&server_addr), addr_len) ==
@@ -65,10 +98,11 @@ public:
     }
     void run() override {
         while (not should_stop) {
-            receive();
+            // mind order, once receive won't receive again.
             if (should_listen) {
                 listen();
             }
+            receive();
             sleep(1);
         }
     }
@@ -112,5 +146,6 @@ private:
     socklen_t addr_len{sizeof(addr)};
 signals:
     void broadcast();
+    void update();
 };
 #endif // CLIENT_H

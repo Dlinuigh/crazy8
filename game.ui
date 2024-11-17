@@ -27,7 +27,7 @@
      <item>
       <widget class="QStackedWidget" name="stackedWidget">
        <property name="currentIndex">
-        <number>4</number>
+        <number>5</number>
        </property>
        <widget class="QWidget" name="main">
         <widget class="QWidget" name="verticalLayoutWidget">
@@ -193,6 +193,47 @@
            <widget class="QPushButton" name="join_cancel">
             <property name="text">
              <string>cancel</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+       <widget class="QWidget" name="play_page">
+        <widget class="QWidget" name="verticalLayoutWidget_7">
+         <property name="geometry">
+          <rect>
+           <x>50</x>
+           <y>10</y>
+           <width>501</width>
+           <height>471</height>
+          </rect>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_7">
+          <item>
+           <widget class="QListWidget" name="points"/>
+          </item>
+          <item>
+           <widget class="QLabel" name="pattern">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="hand"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="play">
+            <property name="text">
+             <string>play select card</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="uncover">
+            <property name="text">
+             <string>uncover a card</string>
             </property>
            </widget>
           </item>
