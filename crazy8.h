@@ -32,32 +32,38 @@ struct Card {
 
     Card(const Suit suit, const Rank rank) : suit(suit), rank(rank) {}
 };
-enum MessageType: uint8_t {
-    info, // server's message
-    start,
-    end,
-    win, // notify everyone about winner.
+namespace crazy8 {
+    enum MessageType : uint8_t {
+        info, // server's message
+        start,
+        end,
+        win, // notify everyone about winner.
+        bye,
+        broadcast,
 
-    play, // player's game operate
-    disconnect,
-    uncover,
-};
+        play, // player's game operate
+        disconnect,
+        uncover,
+        reply_broadcast,
+    };
 #pragma pack(push, 1)
-// size: 32 bytes
-struct Info {
-    char start[5];
-    uint8_t number;
-    uint8_t suit;
-    uint8_t rank;
-    uint8_t hands[7];
-    uint16_t points[7];
-    char end[3];
-};
-struct Message {
-    MessageType type;
-    uint8_t data[sizeof(Info)];
-};
+    // size: 32 bytes
+    struct Info {
+        char start[5];
+        uint8_t number;
+        uint8_t suit;
+        uint8_t rank;
+        uint8_t hands[7];
+        uint16_t points[7];
+        char end[3];
+    };
+    struct Message {
+        MessageType type;
+        uint8_t data[sizeof(Info)];
+    };
 #pragma pack(pop)
+} // namespace crazy8
+
 
 class Board;
 
@@ -89,25 +95,12 @@ public:
         return penalty;
     }
 
-    void operate(const int key, Board &board) {
-        const Card pattern = board.top();
-        if (key > 0 && key <= hand.size()) {
-            if (check(hand.at(key), pattern)) {
-                play(key, board);
-            }
-        } else if (key == ' ') {
-            board.uncover();
-        }
-    }
+    void operate(int, Board &);
 
 private:
     int point{0};
     std::vector<Card> hand{};
-    void play(const int index, Board &board) {
-        // index 经过外面的判断，是一个合理的手牌编号
-        board.discard(std::move(hand.at(index)));
-        hand.erase(hand.begin() + index);
-    }
+    void play(int, Board &);
 
     void input();
 
@@ -126,7 +119,7 @@ class Board {
 public:
     bool order{false};
     int score_to_win{0};
-    Board();
+    Board() = default;
     explicit Board(const std::vector<std::reference_wrapper<Player>> &_players) {
         score_to_win = 50 * _players.size();
         for (auto p: _players) {
@@ -199,15 +192,30 @@ private:
         if (player.get_point() >= score_to_win) {
             champion(player);
         }
-  }
+    }
 
-  void re_roll() {
-    discard_pile.clear();
-    shuffle();
-  }
+    void re_roll() {
+        discard_pile.clear();
+        shuffle();
+    }
 
-  void champion(Player &player) {
-    // TODO 游戏迎来胜利者，但是没有任何处理方法，除了重开一局
-  }
+    void champion(Player &player) {
+        // TODO 游戏迎来胜利者，但是没有任何处理方法，除了重开一局
+    }
 };
+inline void Player::play(const int index, Board &board) {
+    // index 经过外面的判断，是一个合理的手牌编号
+    board.discard(std::move(hand.at(index)));
+    hand.erase(hand.begin() + index);
+}
+inline void Player::operate(const int key, Board &board) {
+    const Card pattern = board.top();
+    if (key > 0 && key <= hand.size()) {
+        if (check(hand.at(key), pattern)) {
+            play(key, board);
+        }
+    } else if (key == ' ') {
+        board.uncover();
+    }
+}
 #endif // CRAZY8_H

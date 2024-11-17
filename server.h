@@ -16,19 +16,20 @@ class Server final : public QThread {
     Q_OBJECT
 public:
     int max_players{0};
+    QVector<in_addr> players_addr{};
     // TODO: 1. server is also a player 2. server is not a player
     // TODO: for 1, host start game and join game, client get the board info, and reply.
     // TODO: for 2, every player get board info from server and reply to server.
+    Server()=default;
     explicit Server(int _max_players) : max_players(_max_players) {
         try {
-            fd = socket(AF_INET, SOCK_DGRAM, 0);
-            if (fd == -1) {
-                throw std::runtime_error("Failed to create socket");
+            if((fd = socket(AF_INET, SOCK_DGRAM, 0))==-1){
+                throw errno;
             }
             fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
             constexpr int broadcast{true};
             if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
-                throw std::runtime_error("Failed to set socket options");
+                throw errno;
             }
             memset(&addr, 0, addr_len);
             addr.sin_family = AF_INET;
@@ -38,15 +39,13 @@ public:
             broadcast_addr.sin_family = AF_INET;
             broadcast_addr.sin_addr.s_addr = INADDR_BROADCAST;
             broadcast_addr.sin_port = htons(port);
-            if (bind(fd, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) < 0) {
-                throw std::runtime_error("Failed to bind");
+            if (bind(fd, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) == -1) {
+                throw errno;
             }
-            // FIXME 终于问题理清了，当程序在虚拟环境下运行会被分配一个合理的ip
             set_addr();
-            buffer.resize(buffer_size);
-            buffer.clear();
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+            qDebug("Server started at %s", inet_ntoa(addr.sin_addr));
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
         }
     }
 
@@ -73,40 +72,60 @@ public:
         qDebug("Receive Signal End");
     }
     void broadcast() const {
-        char message[]{"Hello Players!"};
-        sendto(fd, message, strlen(message), MSG_CONFIRM, reinterpret_cast<const sockaddr *>(&broadcast_addr),
+        // TODO for safe reason, I will introduce a cypher method.
+        char data[]{"Hello Players!"};
+        crazy8::Message message{};
+        message.type = crazy8::MessageType::broadcast;
+        memcpy(message.data, data, sizeof(data));
+        sendto(fd, &message, sizeof(crazy8::Message), MSG_CONFIRM, reinterpret_cast<const sockaddr *>(&broadcast_addr),
                addr_len);
     }
     void receive() {
-        // TODO: receive info, and handle.
         sockaddr_in client_addr{};
         socklen_t len = sizeof(client_addr);
+        crazy8::Message message{};
         try {
-            if (recvfrom(fd, buffer.data(), buffer_size, 0, reinterpret_cast<sockaddr *>(&client_addr), &len) == -1) {
+            if (recvfrom(fd, &message, sizeof(crazy8::Message), 0, reinterpret_cast<sockaddr *>(&client_addr), &len) == -1) {
                 if (errno == EAGAIN) {
                     // not an error. just ignore.
                 } else {
-                    throw std::runtime_error("Failed to receive message");
+                    throw errno;
                 }
             } else {
                 if (should_broadcast) {
-                    if (memcmp(&addr, &client_addr, addr_len) != 0) {
-                        players_addr.push_back(client_addr);
-                        buffer.push_back(QChar('\0'));
-                        qDebug("Message From Client: %p", buffer.data());
+                    if (addr.sin_addr.s_addr == client_addr.sin_addr.s_addr) {
+                        using namespace crazy8;
+                        switch (message.type) {
+                            case crazy8::MessageType::reply_broadcast: {
+                                players_addr.push_back(client_addr.sin_addr);
+                                emit PlayerJoin();
+                                qDebug("Player %s Joined", inet_ntoa(client_addr.sin_addr));
+                                break;
+                            }
+                            case MessageType::play: {
+                                break;
+                            }
+                            case MessageType::uncover: {
+                                break;
+                            }
+                            case MessageType::disconnect: {
+                                break;
+                            }
+                            default: ;
+                        }
                     }
                     if (players_addr.size() == max_players) {
                         should_broadcast = false;
                     }
                 }
             }
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+        } catch (...) {
+                qDebug("Error: %s", strerror(errno));
         }
     }
-    void response(QString &data, const MessageType type) {
+    void response(QString &data, const crazy8::MessageType type) {
         for (auto _addr: players_addr) {
-            Message message{};
+            crazy8::Message message{};
             message.type = type;
             memcpy(message.data, data.data(), sizeof(message.data));
             constexpr int len = sizeof(message);
@@ -114,10 +133,10 @@ public:
             memcpy(buffer, &message, len);
             try {
                 if(sendto(fd, buffer, len, 0, reinterpret_cast<const sockaddr *>(&_addr), addr_len)==-1) {
-                    throw std::runtime_error("Failed to send message");
+                    throw errno;
                 }
-            } catch (std::runtime_error &e) {
-                qDebug("Error: %s", e.what());
+            } catch (...) {
+                qDebug("Error: %s", strerror(errno));
             }
         }
     }
@@ -128,19 +147,16 @@ private:
     bool should_broadcast{true};
     sockaddr_in addr{}, broadcast_addr{};
     uint16_t port{12345};
-    QString buffer{};
-    int buffer_size{1024};
-    std::vector<sockaddr_in> players_addr{};
     socklen_t addr_len{sizeof(addr)};
     void set_addr() {
         char host[NI_MAXHOST]{};
         ifaddrs *ifaddr;
         try {
             if (getifaddrs(&ifaddr) == -1) {
-                throw std::runtime_error("getifaddrs() failed");
+                throw errno;
             }
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
         }
         for (const ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
             if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -150,5 +166,7 @@ private:
         freeifaddrs(ifaddr);
         addr.sin_addr.s_addr = inet_addr(host);
     }
+signals:
+    void PlayerJoin();
 };
 #endif // SERVER_H

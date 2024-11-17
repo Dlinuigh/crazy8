@@ -13,7 +13,9 @@
 #include "crazy8.h"
 
 class Client : public QThread {
+    Q_OBJECT
 public:
+    QVector<in_addr_t> hosts{};
     Client() {
         try {
             fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -26,21 +28,20 @@ public:
             addr.sin_port = htons(port);
             addr.sin_addr.s_addr = htons(INADDR_ANY);
             if (bind(fd, reinterpret_cast<const sockaddr *>(&addr), addr_len) < 0) {
-                throw std::runtime_error("Bind failed");
+                throw errno;
             }
             qDebug("Socket Create Success");
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
         }
     }
     void receive() {
         // receive message and decode them. if address is self
         // emit a signal
     }
-    void response(QString data, const MessageType type) const {
-        // TODO move to handle.
+    void response(QString data, const crazy8::MessageType type) const {
         try {
-            Message message{};
+            crazy8::Message message{};
             message.type = type;
             memcpy(message.data, data.data(), sizeof(message.data));
             constexpr int len = sizeof(message);
@@ -48,10 +49,10 @@ public:
             memcpy(buffer, &message, len);
             if (sendto(fd, buffer, len, MSG_CONFIRM, reinterpret_cast<const sockaddr *>(&server_addr), addr_len) ==
                 -1) {
-                throw std::runtime_error("Send failed");
+                throw errno;
             }
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
         }
     }
     ~Client() override {
@@ -64,6 +65,7 @@ public:
     }
     void run() override {
         while (not should_stop) {
+            receive();
             if (should_listen) {
                 listen();
             }
@@ -75,32 +77,40 @@ public:
         qDebug("Stop Client");
     }
     void listen() {
+        crazy8::Message message{};
+        sockaddr_in server{};
         try {
-            if (recvfrom(fd, buffer.data(), buffer.size(), 0, reinterpret_cast<sockaddr *>(&server_addr), &addr_len)) {
-                if (errno == EAGAIN) {
-
-                } else {
-                    throw std::runtime_error("Receive failed");
-                }
-            } else {
-                buffer.push_back(QChar('\0'));
-                qDebug("Receive BroadCast Message: %p", buffer.data());
-                response();
-                should_listen = false;
+            if (recvfrom(fd, &message, sizeof(crazy8::Message), 0, reinterpret_cast<sockaddr *>(&server), &addr_len) ==
+                -1) {
+                throw errno;
             }
-        } catch (std::runtime_error &e) {
-            qDebug("Error: %s", e.what());
+            if (message.type == crazy8::MessageType::broadcast &&
+                std::find(hosts.begin(), hosts.end(), server.sin_addr.s_addr) == hosts.end()) {
+                qDebug("Receive a Broadcast");
+                hosts.push_back(server.sin_addr.s_addr);
+                emit broadcast();
+            }
+            // TODO if this server selected to join then send a message to server for confirming.
+        } catch (...) {
+            qDebug("Error: %s", strerror(errno));
         }
     }
+    void set_server_addr(in_addr_t addr) {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(port);
+        server_addr.sin_addr.s_addr = addr;
+    }
+    void stop_listen() { should_listen = false; }
 
 private:
     int fd{0};
     int port{12345};
     bool should_stop{false};
     bool should_listen{true};
+    // server addr selected
     sockaddr_in server_addr{}, addr{};
-    int buffer_size{1024};
-    QString buffer{};
     socklen_t addr_len{sizeof(addr)};
+signals:
+    void broadcast();
 };
 #endif // CLIENT_H

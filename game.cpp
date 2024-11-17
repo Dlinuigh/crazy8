@@ -26,12 +26,13 @@ void Game::on_host_pressed() {
 }
 void Game::on_join_pressed() {
     ui->stackedWidget->setCurrentWidget(ui->join_wait);
-    // TODO: find host in lan
+    client_handle->set_server_addr();
 }
 void Game::on_start_game_pressed() {
     // TODO: start a game between players
-    server_handle = std::make_unique<ServerHandle>(server);
+    server_handle = std::make_unique<ServerHandle>(server, ui);
     server_handle->start_game();
+    connect(server.get(), &Server::PlayerJoin, server_handle.get(), &ServerHandle::onPlayerJoined);
 }
 
 void Game::on_host_btn_pressed() { ui->stackedWidget->setCurrentWidget(ui->host_page); }
@@ -39,7 +40,8 @@ void Game::on_join_btn_pressed() {
     ui->stackedWidget->setCurrentWidget(ui->join_page);
     client = std::make_unique<Client>();
     client->start();
-    client_handle = std::make_unique<ClientHandle>(client);
+    client_handle = std::make_unique<ClientHandle>(client, ui);
+    connect(client.get(), &Client::broadcast, client_handle.get(), &ClientHandle::onBroadcastReceived);
 }
 
 void Game::on_cancel_host_pressed() {

@@ -6,23 +6,31 @@
 #define SERVERHANDLE_H
 #include "crazy8.h"
 #include "server.h"
+
+#include <./ui_game.h>
 class ServerHandle final : public QThread {
     Q_OBJECT
     // TODO only start when Server emit a signal.
     // TODO board store here.
 public:
-    explicit ServerHandle(std::unique_ptr<Server> _server): server(_server){
-
-    }
+    explicit ServerHandle(std::unique_ptr<Server> &_server, Ui::Game *_ui) : server(_server), ui(_ui) {}
     void start_game() {
         setup_board();
         send_message(1);
     }
+public slots:
+    void onPlayerJoined() {
+        QString label{inet_ntoa(server->players_addr.back())};
+        ui->invited_players->addItem(label);
+    }
+
 private:
     std::unique_ptr<Board> board{nullptr};
     std::unique_ptr<Server>& server;
+    Ui::Game *ui;
     void setup_board() { board = std::make_unique<Board>(); }
     void send_message(const int type) const {
+        using namespace crazy8;
         QString message;
         if(type == 0) {
             message = generate_message();
@@ -38,14 +46,14 @@ private:
         }
     }
     [[nodiscard]] QString generate_message() const {
-        constexpr int number = server->max_players;
-        Info info{};
+        int number = server->max_players;
+        crazy8::Info info{};
         QString message{};
         Card pattern = board->top();
         auto hands{board->check_players_hand()};
         auto points{board->check_players_points()};
-        strcpy(info.start, "START");
-        strcpy(info.end, "END");
+        memcpy(info.start, "START", sizeof(info.start));
+        memcpy(info.end, "END", sizeof(info.end));
         info.suit = pattern.suit;
         info.rank = pattern.rank;
         for(int i=0; i<number; ++i) {

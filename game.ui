@@ -27,7 +27,7 @@
      <item>
       <widget class="QStackedWidget" name="stackedWidget">
        <property name="currentIndex">
-        <number>3</number>
+        <number>4</number>
        </property>
        <widget class="QWidget" name="main">
         <widget class="QWidget" name="verticalLayoutWidget">
@@ -113,7 +113,7 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QListWidget" name="players_in"/>
+           <widget class="QListWidget" name="players"/>
           </item>
           <item>
            <widget class="QPushButton" name="cancel_join">
@@ -140,7 +140,7 @@
            <enum>QLayout::SizeConstraint::SetMaximumSize</enum>
           </property>
           <item>
-           <widget class="QListWidget" name="players"/>
+           <widget class="QListWidget" name="invited_players"/>
           </item>
           <item>
            <widget class="QPushButton" name="start_game">
@@ -174,7 +174,13 @@
            <enum>QLayout::SizeConstraint::SetMaximumSize</enum>
           </property>
           <item>
-           <widget class="QListWidget" name="game"/>
+           <widget class="QListWidget" name="hosts">
+            <item>
+             <property name="text">
+              <string>Empty</string>
+             </property>
+            </item>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="join">
@@ -204,7 +210,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>26</height>
+     <height>25</height>
     </rect>
    </property>
   </widget>
