@@ -20,6 +20,8 @@ set(PROJECT_SOURCES
         game.h
         game.ui
         ${TS_FILES}
+        ServerHandle.h
+        ClientHandle.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -27,8 +29,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         crazy8.h
-        server.h server.cpp
-        client.h client.cpp
+        server.h
+        client.h
 
 
     )
