@@ -1,20 +1,19 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include <netinet/in.h>
 #include <QThread>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include "crazy8.h"
 
-class Client : public QThread {
+class Client final : public QThread {
     Q_OBJECT
 public:
     std::vector<in_addr_t> hosts{};
-    crazy8::Info buffer{};
     Client() {
         try {
             fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -44,39 +43,48 @@ public:
             if (recvfrom(fd, &message, sizeof(crazy8::Message), 0, reinterpret_cast<sockaddr *>(&host_addr), &len) ==
                 -1) {
                 throw errno;
-            } else {
-                if (addr.sin_addr.s_addr != host_addr.sin_addr.s_addr) {
-                    using namespace crazy8;
-                    switch (message.type) {
-                        case MessageType::start: {
-                            break;
-                        }
-                        case MessageType::end: {
-                            break;
-                        }
-                        case MessageType::win: {
-                            break;
-                        }
-                        case MessageType::info: {
-                            memcpy(&buffer, message.data, sizeof(crazy8::Info));
-                            break;
-                        }
-                        case MessageType::bye: {
-                            break;
-                        }
-                        default:;
+            }
+            if (addr.sin_addr.s_addr != host_addr.sin_addr.s_addr) {
+                using namespace crazy8;
+                const QVector<char> data{message.data, message.data + sizeof(Info)};
+                switch (message.type) {
+                    case MessageType::start: {
+                        emit Start(data);
+                        break;
                     }
+                    case end: {
+                        break;
+                    }
+                    case win: {
+                        break;
+                    }
+                    case info: {
+                        emit Update(data);
+                        break;
+                    }
+                    case bye: {
+                        break;
+                    }
+                    case notify: {
+                        emit PlayerList(data);
+                        break;
+                    }
+                    case deal: {
+                        emit Dealt(data);
+                        break;
+                    }
+                    default:;
                 }
             }
         } catch (...) {
             qDebug("Error: %s", strerror(errno));
         }
     }
-    void response(std::string data, const crazy8::MessageType type) const {
+    void response(QVector<char> &data, const crazy8::MessageType type) const {
         try {
             crazy8::Message message{};
             message.type = type;
-            memcpy(message.data, data.data(), sizeof(message.data));
+            memcpy(message.data, data.data(), sizeof(data));
             constexpr int len = sizeof(crazy8::Message);
             char buffer[len];
             memcpy(buffer, &message, len);
@@ -118,11 +126,18 @@ public:
                 -1) {
                 throw errno;
             }
-            if (message.type == crazy8::MessageType::broadcast &&
-                std::find(hosts.begin(), hosts.end(), server.sin_addr.s_addr) == hosts.end()) {
-                qDebug("Receive a Broadcast");
-                hosts.push_back(server.sin_addr.s_addr);
-                emit broadcast();
+            if (message.type == crazy8::MessageType::broadcast) {
+                qDebug("Received broadcast message");
+                const QVector<char> data{message.data, message.data + sizeof(crazy8::Info)};
+                if (std::find(hosts.begin(), hosts.end(), server.sin_addr.s_addr) == hosts.end()) {
+                    qDebug("Not even record the host addr.");
+                    hosts.push_back(server.sin_addr.s_addr);
+                    emit Broadcast(data);
+                } else {
+                    qDebug("Already recorded the host addr.");
+                }
+            } else {
+                qDebug("Message's type is not broadcast. But %d", message.type);
             }
             // TODO if this server selected to join then send a message to server for confirming.
         } catch (...) {
@@ -141,11 +156,15 @@ private:
     int port{12345};
     bool should_stop{false};
     bool should_listen{true};
+    const int max_buffer_size{10};
     // server addr selected
     sockaddr_in server_addr{}, addr{};
     socklen_t addr_len{sizeof(addr)};
 signals:
-    void broadcast();
-    void update();
+    void Broadcast(QVector<char> data);
+    void Update(QVector<char> data);
+    void PlayerList(QVector<char> data);
+    void Start(QVector<char> data);
+    void Dealt(QVector<char> data);
 };
 #endif // CLIENT_H

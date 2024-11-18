@@ -6,7 +6,6 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <queue>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -16,7 +15,6 @@ class Server final : public QThread {
     Q_OBJECT
 public:
     int max_players{0};
-    std::queue<crazy8::Message> buffer{};
     std::vector<in_addr> players_addr{};
     // TODO: 1. server is also a player 2. server is not a player
     // TODO: for 1, host start game and join game, client get the board info, and reply.
@@ -92,17 +90,16 @@ public:
             }
             if (addr.sin_addr.s_addr != client_addr.sin_addr.s_addr) {
                 using namespace crazy8;
-                buffer.push(message);
-                qDebug("%d", message.type);
+                const QVector<char> data{message.data, message.data + sizeof(Info)};
                 switch (message.type) {
                     case crazy8::MessageType::reply_broadcast: {
                         players_addr.push_back(client_addr.sin_addr);
-                        emit PlayerJoin();
+                        emit PlayerJoin(data);
                         qDebug("Player %s Joined", inet_ntoa(client_addr.sin_addr));
                         break;
                     }
                     case MessageType::play: {
-                        emit PlayerPlay();
+                        emit PlayerPlay(data);
                         break;
                     }
                     case MessageType::disconnect: {
@@ -113,17 +110,22 @@ public:
             }
             if (players_addr.size() == max_players) {
                 should_broadcast = false;
+                qDebug("Stop Broadcast.");
             }
         } catch (...) {
             qDebug("Error: %s", strerror(errno));
         }
     }
-    void response(std::string &data, const crazy8::MessageType type) const {
-        for (int i=0; i<max_players; ++i) {
+    void response(QVector<char>& data, const crazy8::MessageType type) const {
+        for (int i=0; i<players_addr.size(); ++i) {
             chat(i, data, type);
         }
     }
-    void chat(const int index, std::string &data, const crazy8::MessageType type) const {
+    void chat(const int index, QVector<char>& data, const crazy8::MessageType type) const {
+        if(players_addr[index].s_addr == addr.sin_addr.s_addr) {
+            return;
+        }
+        qDebug("Char with No.%d player", index);
         crazy8::Message message{};
         message.type = type;
         memcpy(message.data, data.data(), sizeof(message.data));
@@ -131,18 +133,25 @@ public:
         char buffer[len];
         memcpy(buffer, &message, len);
         try {
-            if (sendto(fd, buffer, len, 0, reinterpret_cast<const sockaddr *>(&players_addr[index]), addr_len) == -1) {
+            sockaddr_in client_addr{};
+            client_addr.sin_family = AF_INET;
+            client_addr.sin_port = htons(port);
+            client_addr.sin_addr = players_addr[index];
+            if (sendto(fd, buffer, len, 0, reinterpret_cast<const sockaddr *>(&client_addr), addr_len) == -1) {
                 throw errno;
             }
         } catch (...) {
             qDebug("Error: %s", strerror(errno));
         }
     }
-
+    [[nodiscard]] sockaddr_in get_addr() const {
+        return addr;
+    }
 private:
     int fd{};
     bool should_stop{false};
     bool should_broadcast{true};
+    int max_buffer_size = 10;
     sockaddr_in addr{}, broadcast_addr{};
     uint16_t port{12345};
     socklen_t addr_len{sizeof(addr)};
@@ -165,8 +174,7 @@ private:
         addr.sin_addr.s_addr = inet_addr(host);
     }
 signals:
-    void PlayerJoin();
-    void PlayerPlay();
-    void PlayerUncover();
+    void PlayerJoin(QVector<char> data);
+    void PlayerPlay(QVector<char> data);
 };
 #endif // SERVER_H

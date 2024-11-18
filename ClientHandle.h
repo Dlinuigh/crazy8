@@ -10,8 +10,6 @@
 #include "crazy8.h"
 class ClientHandle final : public QThread {
     Q_OBJECT
-    // TODO: this lazy thread will start only client thread emit a signal.
-    // TODO: player input will handle at this place. send them to server, but some detail and restrict here.
 public:
     explicit ClientHandle(std::unique_ptr<Client> &_client, Ui::Game *_ui) : client(_client), ui(_ui) {
         connect(ui->hosts, &QListWidget::itemClicked, this, &ClientHandle::set_selected_host);
@@ -20,31 +18,61 @@ public:
     }
     void input(int key) const {
         using namespace crazy8;
-        std::string message;
+        QVector<char> message(sizeof(CardPlayed));
         if (key == -2) {
             client->response(message, MessageType::disconnect);
         } else {
-            crazy8::CardPlayed card;
+            CardPlayed card{};
             card.type = static_cast<int8_t>(key);
-            memcpy(message.data(), &card, sizeof(crazy8::CardPlayed));
-            client->response(message, MessageType::play);
+            memcpy(message.data(), &card, sizeof(CardPlayed));
+            client->response(message, play);
         }
     }
     void set_server_addr() const {
         client->set_server_addr(selected_host);
-        client->response(std::string("Hello!Server"), crazy8::MessageType::reply_broadcast);
+        constexpr char _tmp[]{"Hello! Server."};
+        QVector<char> message{_tmp, _tmp + sizeof(_tmp)};
+        client->response(message, crazy8::MessageType::reply_broadcast);
         client->stop_listen();
     }
 public slots:
-    void onBroadcastReceived() const {
-        // TODO show host in listitem
+    void onBroadcastReceived(QVector<char> data) const {
         in_addr addr{};
         addr.s_addr = client->hosts.back();
         const std::string label{inet_ntoa(addr)};
         ui->hosts->addItem(label.c_str());
     }
-    void onUpdateReceived() const {
-        decode_message(client->buffer);
+    void onUpdateReceived(QVector<char> data){
+        decode_message(data);
+        ui->ismyturn->clear();
+        if(cur_token == my_index) {
+            ui->ismyturn->setText("Your Turn");
+        }else {
+            ui->ismyturn->setText("Others Turn");
+        }
+    }
+    void onPlayerListUpdated(QVector<char> data) const {
+        using namespace crazy8;
+        PlayersList players_list{};
+        memcpy(&players_list, data.data(), sizeof(PlayersList));
+        const int number = players_list.number;
+        for (int i=0; i<number; ++i) {
+            ui->players->addItem(inet_ntoa(players_list.addr[i]));
+        }
+    }
+    void onStartReceived(QVector<char> data) const {
+        ui->stackedWidget->setCurrentWidget(ui->play_page);
+    }
+    void onDealt(QVector<char> data) {
+        using namespace crazy8;
+        Hand hand{};
+        memcpy(&hand, data.data(), sizeof(Hand));
+        my_index = hand.index;
+        ui->hand->clear();
+        for(int i=0;i<hand.number;++i) {
+            std::string card{suit_name[hand.suit[i]]+' '+rank_name[hand.rank[i]]};
+            ui->hand->addItem(card.c_str());
+        }
     }
 
 private:
@@ -52,10 +80,14 @@ private:
     Ui::Game *ui;
     in_addr_t selected_host{};
     bool my_turn = false;
-    void decode_message(const crazy8::Info &info) const {
-        // TODO show info
-        std::string pattern{crazy8::suit_name[info.suit]+' '};
-        pattern+=+crazy8::rank_name[info.rank];
+    int my_index = 0;
+    int cur_token = 0;
+    void decode_message(QVector<char>& data) {
+        using namespace crazy8;
+        Info info{};
+        memcpy(&info, data.data(), sizeof(Info));
+        cur_token = info.index;
+        std::string pattern{suit_name[info.suit]+' '+rank_name[info.rank]};
         ui->pattern->setText(pattern.c_str());
         for(int i=0; i<info.number; ++i) {
             if(info.points[i]>-1) {
@@ -67,11 +99,16 @@ private:
     }
     void set_selected_host(const QListWidgetItem *item) { selected_host = inet_addr(item->text().toLatin1().data()); }
     void on_play_clicked() const {
-        const int index = ui->hand->currentIndex().row();
-        input(index);
+        if(cur_token==my_index) {
+            const int index = ui->hand->currentIndex().row();
+            ui->hand->removeItemWidget(ui->hand->currentItem());
+            input(index);
+        }
     }
     void on_uncover_clicked() const {
-        input(-1);
+        if(cur_token==my_index) {
+            input(-1);
+        }
     }
 };
 #endif // CLIENTHANDLE_H

@@ -19,8 +19,8 @@
      <rect>
       <x>100</x>
       <y>30</y>
-      <width>611</width>
-      <height>501</height>
+      <width>621</width>
+      <height>521</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout_6">
@@ -77,12 +77,19 @@
           <item>
            <widget class="QLabel" name="label">
             <property name="text">
-             <string>游戏人数</string>
+             <string>player numbers</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QSpinBox" name="number"/>
+           <widget class="QSpinBox" name="number">
+            <property name="minimum">
+             <number>2</number>
+            </property>
+            <property name="maximum">
+             <number>7</number>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QPushButton" name="host">
@@ -174,13 +181,7 @@
            <enum>QLayout::SizeConstraint::SetMaximumSize</enum>
           </property>
           <item>
-           <widget class="QListWidget" name="hosts">
-            <item>
-             <property name="text">
-              <string>Empty</string>
-             </property>
-            </item>
-           </widget>
+           <widget class="QListWidget" name="hosts"/>
           </item>
           <item>
            <widget class="QPushButton" name="join">
@@ -210,6 +211,13 @@
           </rect>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7">
+          <item>
+           <widget class="QLabel" name="ismyturn">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
           <item>
            <widget class="QListWidget" name="points"/>
           </item>

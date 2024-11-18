@@ -12,63 +12,71 @@ Game::Game(QWidget *parent) : QMainWindow(parent), ui(new Ui::Game) {
     connect(ui->start_game, &QPushButton::clicked, this, &Game::on_start_game_pressed);
     // from page
     connect(ui->host_cancel, &QPushButton::clicked, this, &Game::on_host_cancel_pressed);
-    connect(ui->join_cancel, &QPushButton::clicked, this, &Game::on_join_cancel_pressedd);
+    connect(ui->join_cancel, &QPushButton::clicked, this, &Game::on_join_cancel_pressed);
     // from wait
     connect(ui->cancel_host, &QPushButton::clicked, this, &Game::on_cancel_host_pressed);
     connect(ui->cancel_join, &QPushButton::clicked, this, &Game::on_cancel_join_pressed);
 }
 void Game::on_host_pressed() {
     ui->stackedWidget->setCurrentWidget(ui->host_wait);
-    // TODO: host start, expose a port to lan
     max_players = ui->number->value();
-    server = std::make_unique<Server>(max_players);
+    create_server();
+    create_server_handle();
+    server_handle->add_self_to_game();
+    bind_server();
     server->start();
 }
-void Game::on_join_pressed() {
+void Game::on_join_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->join_wait);
     client_handle->set_server_addr();
 }
-void Game::on_start_game_pressed() {
-    // TODO: start a game between players
-    server_handle = std::make_unique<ServerHandle>(server, ui);
+void Game::on_start_game_pressed() const {
     server_handle->start_game();
-    connect(server.get(), &Server::PlayerJoin, server_handle.get(), &ServerHandle::onPlayerJoined);
-    connect(server.get(), &Server::PlayerPlay, server_handle.get(), &ServerHandle::onPlayerPlay);
+    ui->stackedWidget->setCurrentWidget(ui->play_page);
 }
 
-void Game::on_host_btn_pressed() { ui->stackedWidget->setCurrentWidget(ui->host_page); }
+void Game::on_host_btn_pressed() const { ui->stackedWidget->setCurrentWidget(ui->host_page); }
 void Game::on_join_btn_pressed() {
     ui->stackedWidget->setCurrentWidget(ui->join_page);
-    client = std::make_unique<Client>();
+    create_client();
+    create_client_handle();
+    bind_client();
     client->start();
-    client_handle = std::make_unique<ClientHandle>(client, ui);
-    connect(client.get(), &Client::broadcast, client_handle.get(), &ClientHandle::onBroadcastReceived);
-    connect(client.get(), &Client::update, client_handle.get(), &ClientHandle::onUpdateReceived);
 }
 
-void Game::on_cancel_host_pressed() {
+void Game::on_cancel_host_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->host_page);
-    // TODO: cancel host this game. remove all players.
     server->request_stop();
 }
-void Game::on_cancel_join_pressed() {
+void Game::on_cancel_join_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->join_page);
     // TODO: exit this game.
 }
 
-void Game::on_host_cancel_pressed() {
+void Game::on_host_cancel_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->main);
     // TODO: cancel host this game, not even start expose the port.
 }
-void Game::on_join_cancel_pressedd() {
+void Game::on_join_cancel_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->main);
     // TODO: cancel join a game, not even in a game.
     client->request_stop();
 }
+void Game::create_server() { server = std::make_unique<Server>(max_players); }
+void Game::create_client() { client = std::make_unique<Client>(); }
+void Game::create_server_handle() { server_handle = std::make_unique<ServerHandle>(server, ui); }
+void Game::create_client_handle() { client_handle = std::make_unique<ClientHandle>(client, ui); }
+void Game::bind_server() {
+    connect(server.get(), &Server::PlayerJoin, server_handle.get(), &ServerHandle::onPlayerJoined);
+    connect(server.get(), &Server::PlayerPlay, server_handle.get(), &ServerHandle::onPlayerPlay);
+}
+void Game::bind_client() {
+    connect(client.get(), &Client::Broadcast, client_handle.get(), &ClientHandle::onBroadcastReceived);
+    connect(client.get(), &Client::Update, client_handle.get(), &ClientHandle::onUpdateReceived);
+    connect(client.get(), &Client::Start, client_handle.get(), &ClientHandle::onStartReceived);
+    connect(client.get(), &Client::PlayerList, client_handle.get(), &ClientHandle::onPlayerListUpdated);
+    connect(client.get(), &Client::Dealt, client_handle.get(), &ClientHandle::onDealt);
+}
 Game::~Game() {
     delete ui;
-    // if (server)
-    //   server->request_stop();
-    // if (client)
-    //   client->request_stop();
 }

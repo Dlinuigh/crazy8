@@ -31,13 +31,20 @@ private:
     std::unique_ptr<ServerHandle> server_handle{nullptr};
     std::unique_ptr<ClientHandle> client_handle{nullptr};
     void on_host_pressed();
-    void on_join_pressed();
-    void on_host_btn_pressed();
+    void on_join_pressed() const;
+    void on_host_btn_pressed() const;
     void on_join_btn_pressed();
-    void on_cancel_host_pressed();
-    void on_cancel_join_pressed();
-    void on_start_game_pressed();
-    void on_host_cancel_pressed();
-    void on_join_cancel_pressedd();
+    void on_cancel_host_pressed() const;
+    void on_cancel_join_pressed() const;
+    void on_start_game_pressed() const;
+    void on_host_cancel_pressed() const;
+    void on_join_cancel_pressed() const;
+
+    void create_server();
+    void create_client();
+    void create_server_handle();
+    void create_client_handle();
+    void bind_server();
+    void bind_client();
 };
 #endif // GAME_H
