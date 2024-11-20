@@ -30,8 +30,11 @@ public:
     }
     void set_server_addr() const {
         client->set_server_addr(selected_host);
-        constexpr char _tmp[]{"Hello! Server."};
-        QVector<char> message{_tmp, _tmp + sizeof(_tmp)};
+        long len{};
+        std::string key{client->get_key(len)};
+        key.append("KYED");
+        key.insert(0, "KYST");
+        QVector<char> message{key.begin(), key.end()};
         client->response(message, crazy8::MessageType::reply_broadcast);
         client->stop_listen();
     }
@@ -42,12 +45,12 @@ public slots:
         const std::string label{inet_ntoa(addr)};
         ui->hosts->addItem(label.c_str());
     }
-    void onUpdateReceived(QVector<char> data){
+    void onUpdateReceived(QVector<char> data) {
         decode_message(data);
         ui->ismyturn->clear();
-        if(cur_token == my_index) {
+        if (cur_token == my_index) {
             ui->ismyturn->setText("Your Turn");
-        }else {
+        } else {
             ui->ismyturn->setText("Others Turn");
         }
     }
@@ -56,21 +59,19 @@ public slots:
         PlayersList players_list{};
         memcpy(&players_list, data.data(), sizeof(PlayersList));
         const int number = players_list.number;
-        for (int i=0; i<number; ++i) {
+        for (int i = 0; i < number; ++i) {
             ui->players->addItem(inet_ntoa(players_list.addr[i]));
         }
     }
-    void onStartReceived(QVector<char> data) const {
-        ui->stackedWidget->setCurrentWidget(ui->play_page);
-    }
+    void onStartReceived(QVector<char> data) const { ui->stackedWidget->setCurrentWidget(ui->play_page); }
     void onDealt(QVector<char> data) {
         using namespace crazy8;
         Hand hand{};
         memcpy(&hand, data.data(), sizeof(Hand));
         my_index = hand.index;
         ui->hand->clear();
-        for(int i=0;i<hand.number;++i) {
-            std::string card{suit_name[hand.suit[i]]+' '+rank_name[hand.rank[i]]};
+        for (int i = 0; i < hand.number; ++i) {
+            std::string card{suit_name[hand.suit[i]] + ' ' + rank_name[hand.rank[i]]};
             ui->hand->addItem(card.c_str());
         }
     }
@@ -79,34 +80,36 @@ private:
     std::unique_ptr<Client> &client;
     Ui::Game *ui;
     in_addr_t selected_host{};
-    bool my_turn = false;
     int my_index = 0;
     int cur_token = 0;
-    void decode_message(QVector<char>& data) {
+    void decode_message(QVector<char> &data) {
         using namespace crazy8;
         Info info{};
         memcpy(&info, data.data(), sizeof(Info));
         cur_token = info.index;
-        std::string pattern{suit_name[info.suit]+' '+rank_name[info.rank]};
+        const std::string pattern{suit_name[info.suit] + ' ' + rank_name[info.rank]};
         ui->pattern->setText(pattern.c_str());
-        for(int i=0; i<info.number; ++i) {
-            if(info.points[i]>-1) {
+        for (int i = 0; i < info.number; ++i) {
+            if (info.points[i] > -1) {
                 ui->points->addItem(
                         ("Score: " + std::to_string(info.points[i]) + " Hands: " + std::to_string(info.hands[i]))
                                 .c_str());
             }
         }
     }
-    void set_selected_host(const QListWidgetItem *item) { selected_host = inet_addr(item->text().toLatin1().data()); }
+    void set_selected_host(const QListWidgetItem *item) {
+        client->selected_host_index = ui->hosts->indexFromItem(item).row();
+        selected_host = client->hosts.at(client->selected_host_index);
+    }
     void on_play_clicked() const {
-        if(cur_token==my_index) {
+        if (cur_token == my_index) {
             const int index = ui->hand->currentIndex().row();
             ui->hand->removeItemWidget(ui->hand->currentItem());
             input(index);
         }
     }
     void on_uncover_clicked() const {
-        if(cur_token==my_index) {
+        if (cur_token == my_index) {
             input(-1);
         }
     }

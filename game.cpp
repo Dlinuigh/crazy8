@@ -50,16 +50,14 @@ void Game::on_cancel_host_pressed() const {
 }
 void Game::on_cancel_join_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->join_page);
-    // TODO: exit this game.
+    // TODO: show a notify to others about exit.
 }
 
 void Game::on_host_cancel_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->main);
-    // TODO: cancel host this game, not even start expose the port.
 }
 void Game::on_join_cancel_pressed() const {
     ui->stackedWidget->setCurrentWidget(ui->main);
-    // TODO: cancel join a game, not even in a game.
     client->request_stop();
 }
 void Game::create_server() { server = std::make_unique<Server>(max_players); }

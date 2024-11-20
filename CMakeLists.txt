@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets LinguistTools network)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets LinguistTools)
+find_package(OpenSSL)
 
 set(TS_FILES crazy8_zh_CN.ts)
 
@@ -22,17 +23,16 @@ set(PROJECT_SOURCES
         ${TS_FILES}
         ServerHandle.h
         ClientHandle.h
+        crypto.h
+        crazy8.h
+        server.h
+        client.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(crazy8
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        crazy8.h
-        server.h
-        client.h
-
-
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET crazy8 APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -56,7 +56,7 @@ else()
     qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 endif()
 
-target_link_libraries(crazy8 PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries(crazy8 PRIVATE Qt${QT_VERSION_MAJOR}::Widgets OpenSSL::SSL OpenSSL::Crypto)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

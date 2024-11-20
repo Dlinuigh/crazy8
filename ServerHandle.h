@@ -40,12 +40,11 @@ public:
         crazy8::PlayersList players_list{};
         players_list.number = server->players_addr.size();
         int i = 0;
-        for (auto &player: server->players_addr) {
+        for (const auto &player: server->players_addr) {
             players_list.addr[i] = player;
             ++i;
         }
-        QVector<char> message;
-        message.resize(sizeof(crazy8::Message));
+        QVector<char> message(sizeof(crazy8::Message));
         memcpy(message.data(), &players_list, sizeof(crazy8::PlayersList));
         server->response(message, crazy8::MessageType::notify);
     }
@@ -150,6 +149,7 @@ private:
             qDebug("End Send Hand info.");
             for (const auto h: board->players.at(0).hand) {
                 std::string hand{suit_name[h.suit] + ' ' + rank_name[h.rank]};
+                qDebug("Card in Hand is: %s", hand.c_str());
                 ui->hand->addItem(hand.c_str());
             }
         } catch (...) {
@@ -169,7 +169,7 @@ private:
     void show_pattern() const {
         qDebug() << "show_pattern";
         using namespace crazy8;
-        std::string pattern{suit_name[board->top().suit] + ' ' + rank_name[board->top().rank]};
+        const std::string pattern{suit_name[board->top().suit] + ' ' + rank_name[board->top().rank]};
         ui->pattern->setText(pattern.c_str());
     }
 };

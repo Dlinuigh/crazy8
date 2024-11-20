@@ -116,10 +116,6 @@ private:
     void play(int, Board &);
 
     void input();
-
-    // TODO
-    // 玩家的输入，包含数字按键和字母按键，数字按键为手牌的顺序，字母空格为揭开，
-
     static bool check(const Card &src, const Card &pat) {
         if (src.suit == pat.suit || src.rank == pat.rank || src.rank == Card::Rank::eight) {
             return true;
@@ -213,7 +209,7 @@ private:
     }
 
     void champion(Player &player) {
-        // TODO 游戏迎来胜利者，但是没有任何处理方法，除了重开一局
+        // TODO show a comfirm dialog to continue play.
     }
 };
 inline void Player::play(const int index, Board &board) {
